@@ -1,0 +1,236 @@
+---
+title: "Port folio 4"
+author: "Martine Lind Jensen"
+date: "20/11/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(pacman)
+pacman::p_load(MuMIn, tidyverse, reshape2)
+```
+
+```{r}
+#loading data 
+df <- read.csv("WHO_suicide_statistics.csv")
+```
+
+Checking for collinearity ##Dont know man
+
+
+```{r}
+#Corfunction
+round(cor(df),2)
+
+'#plot as heatmap
+qplot(x=Var1, y=Var2, data=melt(cor(df)), 
+      fill=value, 
+      geom="tile") +
+   scale_fill_gradient2(limits=c(-1, 1))
+
+
+##### Highlight only the "worrying"" correlation values
+#plot only values above .7
+plot_df <- melt(cor(child))
+plot_df$value[plot_df$value < 0.7 & plot_df$value > - 0.7] = 0
+qplot(x=Var1, y=Var2, data=plot_df, fill=value, geom="tile") +
+   scale_fill_gradient2(limits=c(-1, 1))'
+
+```
+
+Making coloumn that shows the suicide rate pr. population 
+
+Making it promille??
+```{r}
+df$suicide_population <- (df$suicides_no/df$population)*1000
+```
+
+
+Running anova 
+```{r}
+#running anova and storing the output
+anova_df <- aov(df$suicide_population ~ df$age, data = df)
+
+#looking at the output
+summary(anova_df)
+
+#Running anova on the log data 
+
+anova_log <- aov(df_log$log_suicide ~ df_log$age, data = df_log)
+
+summary(anova_log)
+```
+There is a difference between the means, so we reject the null-hypothesis. 
+
+
+
+
+Checking which agegroup is the one that stands out
+```{r}
+
+#On normal data
+m1 <-  lm(df$suicide_population ~ df$age, data = df)
+
+summary(m1)
+
+#On log data 
+
+mlog <- lm(df_log$log_suicide ~ df_log$age, data = df_log)
+
+summary(mlog)
+```
+So this shows that 05-14 years(intercept) is not significantly different from 0 or the mean, pretty sure its 0??? Reject the null-hypothesis?
+
+With the change of the suicide pr population promille the 05-14 is actually significant.
+
+log transformation
+```{r}
+#Removing zeros, so we can do the log transformation. Need to argue that we can do that 
+df_clean <- filter(df, df$suicides_no != "0")
+
+#Making the log transformation
+df_log <- df_clean %>% mutate(log_suicide = log(df_clean$suicide_population))
+
+```
+
+
+Trying to 
+```{r}
+m2 <- lm(df_log$log_suicide ~ df_log$age, data = df_log)
+
+summary(m2)
+```
+
+Posthoc test
+1) Benferroni correction:  conservative, controls the family wise error 
+
+ "The Bonferroni adjustment simply divides the Type I error rate (.05) by the number of tests (in this case, three). Hence, this method is often considered overly conservative. The Bonferroni adjustment can be made using p.adj = “bonferroni” in the pairwise.t.test() function."
+
+```{r}
+#difference is present -> small p-values
+pairwise.t.test(df_log$log_suicide, df_log$age, p.adjust.method = "bonferroni")
+
+```
+2) Tukey’s HSD correction: less conservative, better compromise between Type 1 and Type 2 error
+  
+  "The Tukey Honest Significant Difference (HSD) method controls for the Type I error rate across multiple comparisons and is generally considered an acceptable technique. This method can be executed using the multcomp::glht(Model1, linfct = multcomp::mcp(predictor = “Tukey”))."
+  
+```{r}
+'#we need to make sure predictor is a factor
+happy_allhigh$country <- as.factor(happy_allhigh$country)
+happy_low$country <- as.factor(happy_low$country)
+
+#we also need multcomp library
+pacman::p_load(multcomp)
+
+#no difference -> all p-values are very large
+summary(glht(aov(happiness ~ country, data = happy_allhigh), linfct = mcp(country = "Tukey")))
+
+##difference is present -> small p-values
+summary(glht(aov(happiness ~ country, data = happy_low), linfct = mcp(country = "Tukey")))'
+```
+
+
+Check out this dataframe showing the suicides in these ages.
+```{r}
+#df_0514 <- filter(df, df$age == "05-14 years")
+```
+
+
+15-24 have 133.049
+
+#### Checking assumptions 
+
+1. Homogeneity of variance 
+
+The assumption of homogeneity of variance is that the variance within each of the populations is equal. ANOVA works well even when this assumption is violated except in the case where there are unequal numbers of subjects in the various groups.
+
+Can be checked using barlett.test(outcome ~ predictor, data = mydata):
+  If p value < 0.5 - Significant result, therefore variances cannot be assumed to be equal (violated assumption)
+
+  If p value > 0.5 - Non-significant result, therefore variances can be assumed to be equal (assumption is not violated)
+
+```{r}
+
+#Using the bartlett.test because that is what anita did 
+bartlett.test(df_log$log_suicide ~ df_log$age, data = df)
+
+#Using levenesTest 
+car::leveneTest(df_log$log_suicide ~ df_log$age, data = df)
+
+
+```
+
+In this case, the result is non-significant (p-value > 0.05), meaning variances can not be assumed to be equal.
+
+
+
+2. Checking residuals
+
+plot(model): check everything at once
+plot(model, 1): check linearity
+plot(model, 2): check normality
+plot(model, 3): check homoschedasticity
+plot(model, 4): check influential cases
+
+
+```{r}
+#Checking assumptions of anova
+plot(anova_log)
+
+plot(anova_df)
+
+plot(m2)
+```
+
+log transformation
+```{r}
+#Removing zeros, so we can do the log transformation. Need to argue that we can do that 
+df_clean <- filter(df, df$suicides_no != "0")
+
+#Making the log transformation
+df_log <- df_clean %>% mutate(log_suicide = log(df_clean$suicide_population))
+
+```
+
+
+Trying to 
+```{r}
+m2 <- lm(df_log$log_suicide ~ df_log$age, data = df_log)
+
+summary(m2)
+```
+
+```{r}
+ggplot(df, aes(x = df$age, y = df$suicide_population)) +
+  theme_minimal() +
+    labs(x = "Age", y = "Suicide") +
+  geom_bar(aes(fill= age), stat='summary', fun.y = mean, width = 0.5) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", color = 'black', width = 0.1) +
+  ggtitle("The mean of suicide promille across ages")
+
+
+ggplot(df, aes(x = df$age, y = df$suicides_no)) +
+  theme_minimal() +
+    labs(x = "Age", y = "Suicide") +
+  geom_bar(aes(fill= age), stat='summary', fun.y = mean, width = 0.5) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", color = 'black', width = 0.1) +
+  ggtitle("The mean of suicide across ages")
+```
+
+##### By visualizing the mean 
+We can also support our judgement of results of ANOVA visually by drawing the mean values (just a reminder of code for boxplot with the mean value point). This will also allow to communicate results of the study in a more intuitive way.
+
+*Draw a boxplot with the point for the mean for the second dataset based on example provided* 
+
+```{r}
+#Box plot
+
+ggplot(df, aes(x = df$age, y = df$suicides_no, colour = age)) +
+  geom_boxplot(width = 0.5) +
+  ggtitle("Suicides across ages")+
+  stat_summary(fun.y = mean, geom = "point", shape = 23, colour = "Black")
+```
+

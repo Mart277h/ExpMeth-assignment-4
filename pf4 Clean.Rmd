@@ -1,0 +1,165 @@
+---
+title: "PF4 Kristian"
+author: "Martine Lind Jensen"
+date: "25/11/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(pacman)
+pacman::p_load(MuMIn, tidyverse, reshape2)
+```
+
+
+```{r}
+#loading data 
+df <- read.csv("WHO_suicide_statistics.csv")
+```
+
+First explain why we chose anova and not linear regression
+Anova takes categorical predictors (years = categorical in this df)
+
+Explain why we don't need the collinearity test, logically there is no reason.
+
+We have decided to take population into account explain why.
+
+Making coloumn that shows the suicide rate pr. population 
+
+Making it promille to better read the numbers 
+```{r}
+df$suicide_population <- (df$suicides_no/df$population)*100000
+```
+
+Now i run the anova to see if there is any difference between the means. 
+```{r}
+#running anova and storing the output
+anova_df <- aov(df$suicide_population ~ df$age, data = df)
+
+#looking at the output
+summary(anova_df)
+```
+
+There is a difference between the means, so we reject the null-hypothesis. Report the F-value and P-value. 
+--------Side note. Changing the data to pr population actually makes the 05-14 years significantly different from 0. 
+
+
+Eyeballing the data with a barplot. 
+
+```{r}
+##Errorbars show the standard error
+ggplot(df, aes(x = df$age, y = df$suicide_population)) +
+  theme_minimal() +
+    labs(x = "Age", y = "Suicide") +
+  geom_bar(aes(fill= age), stat='summary', fun.y = mean, width = 0.5) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", color = 'black', width = 0.1) +
+  ggtitle("The mean of suicide rate across ages")
+```
+
+
+Checking assumptions of residuals 
+
+1. Homogeneity of variance 
+
+The assumption of homogeneity of variance is that the variance within each of the populations is equal. ANOVA works well even when this assumption is violated except in the case where there are unequal numbers of subjects in the various groups.
+
+Can be checked using barlett.test(outcome ~ predictor, data = mydata):
+  If p value < 0.5 - Significant result, therefore variances cannot be assumed to be equal (violated assumption)
+
+  If p value > 0.5 - Non-significant result, therefore variances can be assumed to be equal (assumption is not violated)
+
+```{r}
+
+#Using the bartlett.test because that is what anita did, but i dont know if we should levenes test instead
+bartlett.test(df_log$log_suicide ~ df_log$age, data = df_log)
+
+#Using levenesTest to see if that is better, its not
+car::leveneTest(df_log$log_suicide ~ df_log$age, data = df_log)
+
+##Shitty either way, both with the log data and the normal data, i dont know what to report 
+
+```
+
+In this case, the result is non-significant (p-value > 0.05), meaning variances can not be assumed to be equal.
+
+
+
+2. Checking residuals
+
+plot(model): check everything at once
+plot(model, 1): check linearity
+plot(model, 2): check normality
+plot(model, 3): check homoschedasticity
+plot(model, 4): check influential cases
+
+
+```{r}
+#Checking assumptions of residuals
+plot(anova_df)
+```
+
+You see Kristian this looks not so good. I dont know how its supposed to look. But your prob hehehehehheheeheh. 
+
+
+Transforming the shitty data 
+log transformation
+```{r}
+#Removing zeros, so we can do the log transformation. Need to argue that we can do that 
+df_clean <- filter(df, df$suicides_no != "0")
+
+#Making the log transformation
+df_log <- df_clean %>% mutate(log_suicide = log(df_clean$suicide_population))
+```
+
+
+Trying on the log data 
+```{r}
+#Checking assumptions of residuals
+#Making an anova on the log data
+anova_log <- aov(df_log$log_suicide ~ df_log$age, data = df_log)
+plot(anova_log) #1,2,3 ser okay ud
+plot(anova_log, 4)#viser cooks distance, der skal skalaen være under 1 
+```
+Its looking kind of better
+-----Side note i tried with sqrt transformation = crap 
+
+
+So if we say the assumptions are alrighty, then i do the check on which agegroup stands out. 
+
+Checking which agegroup is the one that stands out
+```{r}
+
+#On normal data
+m1 <-  lm(df$suicide_population ~ df$age, data = df)
+
+summary(m1)
+
+#On log data 
+
+mlog <- lm(df_log$log_suicide ~ df_log$age, data = df_log)
+
+summary(mlog)
+```
+
+Boom here you go Kristian 
+
+This is both the log and the normal data. Its just easier to see on the normal data. 
+It says that there is a significantly difference between the agegroups, but that it is the 75+ that is furthest away from the intecept. 
+= old people are very suicidal 
+
+
+
+And then we are gonne do some post hoc test, i dont know why 
+Posthoc test
+1) Benferroni correction:  conservative, controls the family wise error 
+
+ "The Bonferroni adjustment simply divides the Type I error rate (.05) by the number of tests (in this case, three). Hence, this method is often considered overly conservative. The Bonferroni adjustment can be made using p.adj = “bonferroni” in the pairwise.t.test() function."
+ 
+ The book said that we should use bonferroni because of what i have written in the notes. 
+
+```{r}
+#difference is present -> small p-values
+pairwise.t.test(df_log$log_suicide, df_log$age, p.adjust.method = "bonferroni")
+```
+
+I have no idea how to read this. GOOD LUCK KRISTIAN! 
